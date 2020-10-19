@@ -9,7 +9,12 @@ const http = require("http");
 const server = http.createServer(app);
 const io = socketio(server);
 const { formatMessage } = require("./utils/messages");
-const { userJoin, getCurrentUser } = require("./utils/users");
+const {
+  userJoin,
+  getCurrentUser,
+  userLeave,
+  getRoomUsers,
+} = require("./utils/users");
 
 io.on("connection", (socket) => {
   socket.on("joinRoom", ({ username, room }) => {
@@ -18,10 +23,21 @@ io.on("connection", (socket) => {
     socket.broadcast.to(user.room).emit("message", `${username} Connected....`);
   });
   socket.on("chatMessage", (msg) => {
-    io.emit("message", formatMessage("USER", msg));
+    const user = getCurrentUser(socket.id);
+    io.to(user.room).emit("message", formatMessage(user.username, msg));
   });
   socket.on("disconnect", () => {
-    io.emit("message", " A User Left Chat");
+    const user = userLeave(socket.io);
+    if (user) {
+      io.to(user.room).emit(
+        "message",
+        formatMessage(`BOT`, `${user.username} Left Chat`)
+      );
+    }
+    io.to(user.room).emit("roomUsers", {
+      room: user.room,
+      users: getRoomUsers(user.room),
+    });
   });
 });
 
